@@ -1,0 +1,554 @@
+cd XXX
+bin/neo4j start
+bin/neo4j stop
+
+
+# CREATE nodes
+CREATE (n)
+CREATE (n),(m)
+CREATE (n:Person)
+CREATE (n:Person:Swedish)
+CREATE (n:Person { name: 'Andy', title: 'Developer' })
+
+# CREATE relationships
+CREATE (a:Person { name: 'A'})
+CREATE (b:Person { name: 'B'})
+
+MATCH (a:Person),(b:Person) 
+WHERE a.name = 'A' AND b.name = 'B' 
+CREATE (a)-[r:RELTYPE]->(b) 
+RETURN type(r)
+
+# CREATE realtionships and set properties
+MATCH (a:Person),(b:Person) 
+WHERE a.name = 'A' AND b.name = 'B'
+CREATE (a)-[r:RELTYPE { name: 'from A to B' }]->(b) 
+RETURN type(r), r.name
+
+# CREATE a full path
+CREATE p=(andy { name:'Andy' })-[:WORKS_AT]->(neo)<-[:WORKS_AT]-(michael { name: 'Michael' }) 
+RETURN p
+
+# DELETE all nodes and relationships
+MATCH (n) 
+DETACH DELETE n
+
+# DELETE (sample data)
+CREATE (a:Person {name:'Andy', age: 36}),(b:Person {name:'UNKNOWN'}), 
+(c:Person {name:'Timothy', age:25}), (d:Person {name:'Peter', age:34}), 
+(a)-[:KNOWS]->(c), (a)-[:KNOWS]->(d)
+
+# DELETE a single node
+MATCH (n:Person { name: 'UNKNOWN' }) 
+DELETE n
+
+# DELETE relationships only
+MATCH (n { name: 'Andy' })-[r:KNOWS]->() 
+DELETE r
+
+# DELETE a node with all its relationships
+MATCH (n { name: 'Andy' }) 
+DETACH DELETE n
+
+# SET (sample data)
+CREATE (a:Person  {name:'Stefan'}),
+(b:P {name:'Andy', age:36, hungry:true}), 
+(c {name:'George'}),
+(d {name:'Peter', age:34}), 
+(a)-[:KNOWS]->(b), (b)-[:KNOWS]->(d), (c)-[:KNOWS]->(d)
+
+# SET a property
+MATCH (n { name: 'Andy' }) 
+SET n.surname = 'Taylor' 
+RETURN n.name, n.surname
+
+# UPDATE a property
+MATCH (n { name: 'Andy' }) 
+SET n.age = toString(n.age) 
+RETURN n.name, n.age
+
+# REMOVE a property
+MATCH (n { name: 'Andy' }) 
+SET n.name = NULL 
+RETURN n.name, n.age
+
+# COPY properties between nodes and relationships
+MATCH (at { surname: 'Taylor' }),(pn { name: 'Peter' }) 
+SET at = pn 
+RETURN at.name, at.age, at.hungry, pn.name, pn.age
+
+# REPLACE all properties using a map and =
+MATCH (p { name: 'Peter' }) 
+SET p = { name: 'Peter Smith', position: 'Entrepreneur' } 
+RETURN p.name, p.age, p.position
+
+# REMOVE all properties using an empty map and =
+MATCH (p { name: 'Peter Smith' }) 
+SET p = { } 
+RETURN p.name, p.age
+
+# MUTATE specific properties using a map and +=
+MATCH (p { name: 'George' }) 
+SET p += { age: 38, hungry: TRUE , position: 'Entrepreneur' } 
+RETURN p.name, p.age, p.hungry, p.position
+
+# SET multiple properties using one SET clause
+MATCH (n { name: 'Stefan' }) 
+SET n.position = 'Developer', n.surname = 'Taylor'
+
+# SET a label on a node
+MATCH (n { name: 'Stefan' }) 
+SET n:German 
+RETURN n.name, labels(n) AS labels
+
+# SET multiple labels on a node
+MATCH (n { name: 'George' }) 
+SET n:Swedish:Bossman 
+RETURN n.name, labels(n) AS label
+
+# REMOVE (sample data)
+CREATE (a:Swedish  {name:'Andy', age: 36}),
+(b:Swedish :German {name:'Peter', age: 34}), 
+(c:Swedish {name:'Timothy', age: 25}),
+(a)-[:KNOWS]->(b), (a)-[:KNOWS]->(c)
+
+# REMOVE a property
+MATCH (a { name: 'Andy' }) 
+REMOVE a.age 
+RETURN a.name, a.age
+
+# REMOVE a label from a node
+MATCH (n { name: 'Peter' }) 
+REMOVE n:German 
+RETURN n.name, labels(n)
+
+# FOREACH (sample data)
+CREATE (a:Person {name:'A'}),
+(b:Person {name: 'B'}),
+(c:Person {name: 'C'}),
+(d:Person {name: 'D'}),
+(a)-[:KNOWS]->(b)-[:KNOWS]->(c)-[:KNOWS]->(d)
+
+# MARK all nodes along a path 
+MATCH p =(begin)-[*]->(end) 
+WHERE begin.name = 'A' AND end.name = 'D' 
+FOREACH (n IN nodes(p)| SET n.marked = TRUE )
+
+# MATCH (sample data)
+CREATE (p1:Person {name: 'Oliver Stone'}),
+(p2:Person {name: 'Michael Douglas'}),
+(p3:Person {name: 'Charlie Sheen'}),
+(p4:Person {name: 'Martin Sheen'}),
+(p5:Person {name: 'Rob Reiner'}),
+(m1:Movie {title: 'Wall Street'}),
+(m2:Movie {title: 'The American President'}),
+(p1)-[:DIRECTED]->(m1),
+(p2)-[:ACTED_IN {role: 'Gordon Gekko'}]->(m1),
+(p3)-[:ACTED_IN {role: 'Bud Fox'}]->(m1),
+(p2)-[:ACTED_IN {role: 'President Andrew Shepherd'}]->(m2),
+(p4)-[:ACTED_IN {role: 'Carl Fox'}]->(m1),
+(p4)-[:ACTED_IN {role: 'A.J. Mclnerney'}]->(m2),
+(p5)-[:DIRECTED]->(m2)
+
+# GET all nodes
+MATCH (n) RETURN n
+
+# GET all nodes with a label
+MATCH (movie:Movie) 
+RETURN movie.title
+
+# GET related nodes
+MATCH (director { name: 'Oliver Stone' })--(movie) 
+RETURN movie.title
+
+# MATCH with labels
+MATCH (:Person { name: 'Oliver Stone' })--(movie:Movie) 
+RETURN movie.title
+
+# Outgoing relationships
+MATCH (:Person { name: 'Oliver Stone' })-->(movie) 
+RETURN movie.title
+
+# Directed relationships and variable
+MATCH (:Person { name: 'Oliver Stone' })-[r]->(movie)
+RETURN type(r)
+
+# MATCH on a relationship type
+MATCH (wallstreet:Movie { title: 'Wall Street' })<-[:ACTED_IN]-(actor) 
+RETURN actor.name
+
+# MATCH on multiple relationship types
+MATCH (wallstreet { title: 'Wall Street' })<-[:ACTED_IN|:DIRECTED]-(person) 
+RETURN person.name
+
+# MATCH on relationship type and use a variable
+MATCH (wallstreet { title: 'Wall Street' })<-[r:ACTED_IN]-(actor) 
+RETURN r.role
+
+# MATCH multiple relationships
+MATCH (charlie { name: 'Charlie Sheen' })-[:ACTED_IN]->(movie)<-[:DIRECTED]-(director) 
+RETURN movie.title, director.name
+
+# Variable length relationships
+MATCH (martin { name: 'Charlie Sheen' })-[:ACTED_IN*1..3]-(movie:Movie) 
+RETURN movie.title
+
+# Relationship variable in variable length relationships
+MATCH p =(actor { name: 'Charlie Sheen' })-[:ACTED_IN*2]-(co_actor) 
+RETURN relationships(p)
+
+# ADD properties
+MATCH (charlie:Person { name: 'Charlie Sheen' }),(martin:Person { name: 'Martin Sheen' }) 
+CREATE (charlie)-[:X { blocked: FALSE }]->(:UNBLOCKED)<-[:X { blocked: FALSE }]-(martin) , 
+(charlie)-[:X { blocked: TRUE }]->(:BLOCKED)<-[:X { blocked: FALSE }]-(martin)
+
+# MATCH with properties on a variable length path
+MATCH p =(charlie:Person)-[* { blocked:false }]-(martin:Person)
+WHERE charlie.name = 'Charlie Sheen' AND martin.name = 'Martin Sheen' 
+RETURN p
+
+# Zero length paths
+MATCH (wallstreet:Movie { title: 'Wall Street' })-[*0..1]-(x) RETURN x
+
+# Named paths
+MATCH p =(michael { name: 'Michael Douglas' })-->() 
+RETURN p
+
+# Matching on a bound relationship
+MATCH (a)-[r]-(b) 
+WHERE a.title='Wall Street' 
+RETURN a,b
+
+# Single shortest path
+MATCH (martin:Person { name: 'Martin Sheen' }),(oliver:Person { name: 'Oliver Stone' }), 
+p = shortestPath((martin)-[*..15]-(oliver)) 
+RETURN p
+
+# All shortest paths
+MATCH (martin:Person { name: 'Martin Sheen' }),
+	(michael:Person { name: 'Michael Douglas' }), 
+	p = allShortestPaths((martin)-[*]-(michael)) 
+RETURN p
+
+# MATCH node, relationship by id
+
+# OPTIONAL MATCH
+MATCH (a:Movie { title: 'Wall Street' }) 
+OPTIONAL MATCH (a)-->(x) 
+RETURN x
+
+# OPTIONAL MATCH
+MATCH (a:Movie { title: 'Wall Street' }) 
+OPTIONAL MATCH (a)-[r:ACTS_IN]->() 
+RETURN a.title, r
+
+# WHERE (sample data)
+CREATE (p1:Swedish {name:'Andy', age:36, belt:'white'}),
+(p2 {email:'peter_n@example.com', name:'Peter', age:35}), 
+(p3 {address:'Sweden/Malmo', name:'Timothy', age:25}), 
+(p1)-[:KNOWS {since: 1999}]->(p2), 
+(p1)-[:KNOWS {since: 2012}]->(p3)
+
+# Filter on node label
+MATCH (n) 
+WHERE n:Swedish 
+RETURN n.name, n.age
+
+# Filter on node property
+MATCH (n) 
+WHERE n.age < 30 
+RETURN n.name, n.age
+
+# Filter on relationship property
+MATCH (n)-[k:KNOWS]->(f) 
+WHERE k.since < 2000 
+RETURN f.name, f.age, f.email
+
+# Filter on dynamically-computed node property
+WITH 'AGE' AS propname 
+MATCH (n) 
+WHERE n[toLower(propname)]< 30 
+RETURN n.name, n.age
+
+# Property existence checking
+MATCH (n) 
+WHERE exists(n.belt) 
+RETURN n.name, n.belt
+
+# Prefix string search using STARTS WITH (case-sensitive)
+MATCH (n) 
+WHERE n.name STARTS WITH 'Pet' 
+RETURN n.name, n.age
+
+# Suffix string search using ENDS WITH (case-sensitive)
+MATCH (n) 
+WHERE n.name ENDS WITH 'ter' 
+RETURN n.name, n.age
+
+# Substring search using CONTAINS
+MATCH (n) 
+WHERE n.name CONTAINS 'ete' 
+RETURN n.name, n.age
+
+# String matching negation
+MATCH (n) 
+WHERE NOT n.name ENDS WITH 'y' 
+RETURN n.name, n.age
+
+# Matching using regular expressions
+MATCH (n) 
+WHERE n.name =~ 'Tim.*' 
+RETURN n.name, n.age
+
+# Case-insensitive regular expressions
+MATCH (n) 
+WHERE n.name =~ '(?i)AND.*' 
+RETURN n.name, n.age
+
+# Filter on patterns
+MATCH (timothy { name: 'Timothy' }),(others) 
+WHERE others.name IN ['Andy', 'Peter'] AND (timothy)<--(others) 
+RETURN others.name, others.age
+
+# Filter on patterns using NOT
+MATCH (persons),(peter { name: 'Peter' }) 
+WHERE NOT (persons)-->(peter) 
+RETURN persons.name, persons.age
+
+# Filter on patterns with properties
+MATCH (n) 
+WHERE (n)-[:KNOWS]-({ name: 'Timothy' }) 
+RETURN n.name, n.age
+
+# Filter on relationship type
+MATCH (n)-[r]->() 
+WHERE n.name='Andy' AND type(r)=~ 'K.*' 
+RETURN type(r), r.since
+
+# Lists (IN operator)
+MATCH (a) 
+WHERE a.name IN ['Peter', 'Timothy'] 
+RETURN a.name, a.age
+
+# Range (<, <=, >=, >)
+MATCH (a) 
+WHERE a.name >= 'Peter' 
+RETURN a.name, a.age
+
+# ORDER BY (sample data)
+CREATE (n1 {name:'A', age:34, length:170}),
+(n2 {name:'B', age:34}), 
+(n3 {name:'C', age:32, length:185}), 
+(n1)-[:KNOWS]->(n2)-[:KNOWS]->(n3)
+
+# Order nodes by property
+MATCH (n) 
+RETURN n.name, n.age 
+ORDER BY n.name
+
+# Order nodes by multiple properties
+MATCH (n) 
+RETURN n.name, n.age 
+ORDER BY n.age, n.name
+
+# Order nodes in descending order
+MATCH (n) 
+RETURN n.name, n.age 
+ORDER BY n.name DESC
+
+# When soring, null will come at the end of the result set for ascending sorting.
+MATCH (n) 
+RETURN n.length, n.name, n.age 
+ORDER BY n.length
+
+# LIMIT (Sample data)
+CREATE (n1 {name:'A'}),(n2 {name:'B'}),(n3 {name:'C'}), (n4 {name:'D'}), (n5 {name:'E'}),
+(n1)-[:KNOWS]->(n2),
+(n1)-[:KNOWS]->(n3),
+(n1)-[:KNOWS]->(n4),
+(n1)-[:KNOWS]->(n5)
+
+# LIMIT
+MATCH (n) 
+RETURN n.name 
+ORDER BY n.name 
+LIMIT 3
+
+# SKIP
+MATCH (n) 
+RETURN n.name 
+ORDER BY n.name 
+SKIP 3
+
+# SKIP & LIMIT
+MATCH (n) 
+RETURN n.name 
+ORDER BY n.name 
+SKIP 1 
+LIMIT 2
+
+# RETURN (sample data)
+CREATE (a {name:'A', happy:'Yes', age: 55}), 
+(b {name: 'B'}), 
+(a)-[:BLOCKS]->(b), 
+(a)-[:KNOWS]->(b)
+
+# RETURN nodes
+MATCH (n { name: 'B' }) 
+RETURN n
+
+# RETURN relationships
+MATCH (n { name: 'A' })-[r:KNOWS]->(c) 
+RETURN r
+
+# RETURN property
+MATCH (n { name: 'A' }) 
+RETURN n.name
+
+# RETURN all elements
+MATCH p =(a { name: 'A' })-[r]->(b) 
+RETURN *
+
+# Column alias
+MATCH (a { name: 'A' }) 
+RETURN a.age AS SomethingTotallyDifferent
+
+# Optional properties
+MATCH (n) 
+RETURN n.age
+
+# Other expressions
+MATCH (a { name: 'A' }) 
+RETURN a.age > 30, "I'm a literal",(a)-->()
+
+# Unique results
+MATCH (a { name: 'A' })-->(b) 
+RETURN DISTINCT b
+
+# WITH (sample data)
+CREATE (n1 {name:'Anders'}),
+(n2 {name:'Ceasar'}),
+(n3 {name:'Bossman'}),
+(n4 {name:'George'}),
+(n5 {name:'David'}),
+(n1)-[:BLOCKS]->(n2),
+(n1)-[:KNOWS]->(n3),
+(n5)-[:KNOWS]->(n1),
+(n2)-[:KNOWS]->(n4),
+(n3)-[:KNOWS]->(n4),
+(n3)-[:BLOCKS]->(n5)
+
+# Filter on aggregate function results
+MATCH (david { name: 'David' })--(otherPerson)-->() 
+WITH otherPerson, count(*) AS foaf 
+WHERE foaf > 1 
+RETURN otherPerson.name
+
+# Sort results before using collect on them
+MATCH (n) 
+WITH n 
+ORDER BY n.name DESC LIMIT 3 
+RETURN collect(n.name)
+
+# Limit branching of a path search
+MATCH (n { name: 'Anders' })--(m) 
+WITH m 
+ORDER BY m.name DESC LIMIT 1 
+MATCH (m)--(o) 
+RETURN o.name
+
+# UNWIND a list
+UNWIND [1, 2, 3, NULL ] AS x 
+RETURN x, 'val' AS y
+
+# Creating a distinct list
+WITH [1, 1, 2, 2] AS coll 
+UNWIND coll AS x 
+WITH DISTINCT x 
+RETURN collect(x) AS setOfVals
+
+# Using UNWIND with a list of lists
+WITH [[1, 2],[3, 4], 5] AS nested 
+UNWIND nested AS x 
+UNWIND x AS y 
+RETURN y
+
+# MERGE (sample data)
+CREATE (p1:Person {name:'Charlie Sheen', bornIn:'New York'}),
+(p2:Person {name: 'Oliver Stone', bornIn: 'New York'}),
+(p3:Person {name: 'Michael Douglas', bornIn: 'New Jersey'}),
+(p4:Person {name: 'Martin Sheen', bornIn: 'Ohio'}),
+(p5:Person {name: 'Rob Reiner', bornIn: 'New York'}),
+(m1:Movie {title: 'Wall Street'}),
+(m2:Movie {title: 'The American President'}),
+(p1)-[:ACTED_IN]->(m1),
+(p1)-[:FATHER]->(p4),
+(p2)-[:ACTED_IN]->(m1),
+(p3)-[:ACTED_IN]->(m1),
+(p3)-[:ACTED_IN]->(m2),
+(p4)-[:ACTED_IN]->(m1),
+(p4)-[:ACTED_IN]->(m2),
+(p5)-[:ACTED_IN]->(m2)
+
+# Merge single node with a label
+MERGE (robert:Critic) 
+RETURN robert, labels(robert)
+
+# Merge single node with properties
+MERGE (charlie { name: 'Charlie Sheen', age: 10 }) 
+RETURN charlie
+
+# Merge with ON CREATE
+MERGE (keanu:Person { name: 'Keanu Reeves' }) 
+ON CREATE SET keanu.created = timestamp() 
+RETURN keanu.name, keanu.created
+
+# Merge with ON MATCH
+MERGE (person:Person) 
+ON MATCH SET person.found = TRUE 
+RETURN person.name, person.found
+
+# Merge with ON CREATE and ON MATCH
+MERGE (keanu:Person { name: 'Keanu Reeves' }) 
+ON CREATE SET keanu.created = timestamp() 
+ON MATCH SET keanu.lastSeen = timestamp() 
+RETURN keanu.name, keanu.created, keanu.lastSeen
+
+# Merge on a relationship
+MATCH (charlie:Person { name: 'Charlie Sheen' }),
+      (wallStreet:Movie { title: 'Wall Street' }) 
+MERGE (charlie)-[r:ACTED_IN]->(wallStreet) 
+RETURN charlie.name, type(r), wallStreet.title
+
+# Merge on multiple relationships
+MATCH (oliver:Person { name: 'Oliver Stone' }),
+      (reiner:Person { name: 'Rob Reiner' }) 
+MERGE (oliver)-[:DIRECTED]->(movie:Movie)<-[:ACTED_IN]-(reiner) 
+RETURN movie
+
+# SET (sample data)
+CREATE (n1:Actor {name:'Anthony Hopkins'}),
+(n2:Actor {name:'Hitchcock'}),
+(n3:Actor {name:'Helen Mirren'}),
+(m1:Movie {title:'Hitchcock'}),
+(n1)-[:KNOWS]->(n3),
+(n1)-[:ACTS_IN]->(m1),
+(n3)-[:ACTS_IN]->(m1)
+
+# Combine two queries and retain duplicates
+MATCH (n:Actor) 
+RETURN n.name AS name 
+UNION ALL MATCH (n:Movie) 
+RETURN n.title AS name
+
+# Combine two queries and remove duplicates
+MATCH (n:Actor) 
+RETURN n.name AS name 
+UNION MATCH (n:Movie) 
+RETURN n.title AS name
+
+
+
+
+
+
