@@ -1,0 +1,328 @@
+---
+title: "Exploratory Data Analysis"
+output: html_document
+---
+
+```{r set-options, echo=FALSE}
+options(width = 160)
+library(knitr)
+opts_chunk$set(comment = NA)
+```
+
+## Import Packages and Data
+```{r warning=FALSE, message=FALSE, comment=NA}
+setwd("C:/Users/Annie/Desktop/제5회 Big Data Competition-Digital Trend Analyzer")
+library(data.table)
+library(dplyr)
+library(stringr) # str_detect
+library(lubridate)
+library(kableExtra)
+Sys.setlocale('LC_ALL','K')
+Product <- fread("제5회 Big Data Competition-분석용데이터-01.Pruduct.csv", encoding = "UTF-8")
+Search1 <- fread("제5회 Big Data Competition-분석용데이터-02.Search1.csv", encoding = "UTF-8")
+Search2 <- fread("제5회 Big Data Competition-분석용데이터-03.Search2.csv", encoding = "UTF-8")
+Custom <- fread("제5회 Big Data Competition-분석용데이터-04.Custom.csv", encoding = "UTF-8")
+Session <- fread("제5회 Big Data Competition-분석용데이터-05.Session.csv", encoding = "UTF-8")
+Master <- fread("제5회 Big Data Competition-분석용데이터-06.Master.csv", encoding = "UTF-8")
+```
+
+### PRODUCT (data size : 5024906 x 8)
+#### &#10161; 상품 구매 데이터 - 구매된 상품명 등 방문자의 상품 구매 정보   
+
+* HITS_SEQ : Web/App 에서 페이지 또는 화면 클릭, 이벤트 참여, 검색 등 방문자의 행위에 대해 순서대로 배열된 일련번호
+(세션 내에서 발생되며 첫 번째 행위=1) (숫자가 같은 경우 = 장바구니에 담긴 모든 물품 주문)
+* PD_BUY_AM : 구매한 상품 1개의 금액
+* PD_BUY_CT : 구매한 상품의 수량
+
+\  
+
+#### 1. 숫자형 데이터로 변환
+```{r comment=NA}
+head(Product)
+sapply(Product,class)
+Product$PD_BUY_AM <- as.numeric(gsub(",","",Product$PD_BUY_AM))
+Product$PD_BUY_CT <- as.numeric(gsub(",","",Product$PD_BUY_CT))
+sapply(Product,class)
+```
+
+\  
+
+#### 2. 결측값 확인 - 없음
+```{r}
+sum(complete.cases(Product)==F) # no missing value
+```
+
+\  
+
+#### 3. 이상값 확인 - (1) 단품 가격이 100원 미만
+```{r comment=NA}
+summary(Product$PD_BUY_AM)
+sum(Product$PD_BUY_AM < 100)
+less100 <- which(Product$PD_BUY_AM < 100)
+head(Product[less100,])
+```
+
+가격이 낮은 제품의 예시 (어떻게 처리해야 할까? - 단순 사은품만은 아닌거 같음): 
+<http://www.11st.co.kr/product/SellerProductDetail.tmall?method=getSellerProductDetail&prdNo=1892763895>
+
+\  
+
+#### 3. 이상값 확인 - (2) HITS_SEQ가 1
+```{r}
+hts <- filter(Product, HITS_SEQ==1)
+nrow(hts)/nrow(Product)
+```
+
+\  
+
+#### 4. 새로운 변수 - 총 구매금액
+```{r}
+Product$PD_BUY_TOT <- Product$PD_BUY_AM * Product$PD_BUY_CT
+```
+
+--------------------------------------------------------------------------
+
+### SEARCH 1 (data size : 2884943 x 4) 
+#### &#10161; 상품을 구매한 방문자 각 개인의 (CLNT_ID 별) 검색량 데이터
+```{r comment=NA}
+head(Search1)
+sapply(Search1,class)
+```
+* HITS_SEQ : 검색창에 입력한 검색 키워드
+* SEARCH_CNT : 세션 내 해당 검색어 검색량
+
+\  
+
+#### 1. 결측값 확인 - 결측값 없음
+```{r comment=NA}
+sum(complete.cases(Search1)==F)
+```
+
+\ 
+ 
+#### 2. 검색량 분포 확인
+```{r comment=NA}
+summary(Search1$SEARCH_CNT)
+Search1[Search1$SEARCH_CNT==98]
+```
+
+--------------------------------------------------------------------------
+
+### SEARCH 2 (data size : 8051172 x 3)
+#### &#10161; 날짜별 검색량 데이터
+```{r comment=NA}
+head(Search2)
+```
+
+\  
+     
+#### 1. 데이터 변환
+```{r}
+sapply(Search2,class)
+Search2$SEARCH_CNT <- as.numeric(gsub(",","",Search2$SEARCH_CNT))
+```
+
+\ 
+
+#### 2. 결측값 확인
+```{r}
+sum(complete.cases(Search2)==F)
+```
+
+\ 
+ 
+#### 3. 날짜별 최다 검색어
+```{r}
+Search2 %>% group_by(SESS_DT) %>% filter(SEARCH_CNT == max(SEARCH_CNT)) %>% arrange(SESS_DT, KWD_NM, SEARCH_CNT)
+```
+
+```{r}
+max_sch <- Search2 %>% group_by(SESS_DT) %>% filter(SEARCH_CNT == max(SEARCH_CNT))
+knitr::kable(t(table(max_sch$KWD_NM)))
+```
+
+* 압도적으로 원피스가 많음
+* 5월 21일 (조르지오 아르마니) : 롯데닷컴에서 신상품 선공개
+* 8월 1일 (홍샷) : 7월 31일 롯데홈쇼핑에서 홍샷 완판 
+
+\ 
+
+#### 4. 월별 검색량
+```{r}
+Search2$MONTH <- month(ymd(Search2$SESS_DT))
+as.data.frame(Search2 %>% group_by(MONTH,KWD_NM) %>% summarise(sum_cnt = sum(SEARCH_CNT)) %>% top_n(5) %>% arrange(MONTH, desc(sum_cnt)))
+```
+
+--------------------------------------------------------------------------
+
+### CUSTOM (data size : 671679 x 3)
+#### &#10161; 회원 데이터
+* 방문자(Visitors)의 쿠키에 랜덤으로 부여된 고유 ID
+(기기, 디바이스, 브라우저 체제에 따라 다른 방문자로 인식되어 동일고객이라도 여러 개의 클라이언트 ID 를 보유할 수 있음)
+
+```{r}
+head(Custom)
+```
+
+\  
+
+#### 1. 결측값 확인
+```{r}
+sum(complete.cases(Custom)==F)
+```
+
+\  
+
+#### 2. 기초통계량
+##### (1) 성별
+```{r}
+knitr::kable(Custom[, list(count=.N,prop = round(.N/nrow(Custom),2)), by=CLNT_GENDER])%>%kable_styling(full_width = F)
+```
+
+##### (2) 연령대
+```{r}
+knitr::kable(Custom[, list(count=.N,prop = round(.N/nrow(Custom),2)), by=CLNT_AGE])%>%kable_styling(full_width = F)
+```
+
+##### (3) 성별 + 연령대
+```{r}
+knitr::kable(t(Custom[, list(count=.N,prop = round(.N/nrow(Custom),2)), by=.(CLNT_AGE,CLNT_GENDER)]))%>%kable_styling(full_width = F)
+```
+
+--------------------------------------------------------------------------
+
+## SESSION (data size : 2712907 x 9)
+#### &#10161; 상품 구매한 방문자의 세션 데이터
+* SESS_ID : 세션이 시작될 때 부여된 고유 ID (하나의 CLNT_ID에 여러 개의 SESS_ID)
+    - 사이트 간 이동
+    - 세션 활동이 없을 경우 30 뒤 만료
+    - 자정
+* SESS_SEQ : 접속 후 세션이 시작될 때 부여된 일련번호 (SESS_ID의 순서)
+* TOT_PAG_VIEW_CT : 세션 내의 총 페이지(화면) 뷰 수
+* TOT_SESS_HR_V : 세션 내 총 시간(단위: 초)
+* DVC_CTG_NM : 기기 유형(1: desktop , 2: mobile, 3: tablet)
+* ZON_NM : 대분류 지역명
+* CITY_NM : 중분류 지역명
+
+\  
+
+#### 1. 데이터 변환
+```{r}
+head(Session)
+sapply(Session,class)
+Session$TOT_SESS_HR_V <- as.numeric(gsub(",","",Session$TOT_SESS_HR_V))
+```
+
+\  
+
+#### 2. 결측값 확인
+```{r}
+sum(complete.cases(Session)==F)
+```
+
+###### (1) 둘 다 NA
+```{r}
+sum(is.na(Session$TOT_SESS_HR_V) & is.na(Session$TOT_PAG_VIEW_CT)) 
+```
+
+###### (2) TOT_SESS_HR_V = NA, TOT_PAG_VIEW_CT > 1
+```{r}
+sum(is.na(Session$TOT_SESS_HR_V) & Session$TOT_PAG_VIEW_CT>1, na.rm = T) 
+```
+
+###### (3) TOT_SESS_HR_V != NA, TOT_PAG_VIEW_CT = NA (총 9개)
+```{r}
+idx<- which(Session$TOT_SESS_HR_V==1 & is.na(Session$TOT_PAG_VIEW_CT)) # 2136811
+Session[idx,]
+idx<- which(Session$TOT_SESS_HR_V > 1 & is.na(Session$TOT_PAG_VIEW_CT))
+Session[idx,]
+```
+ 
+\  
+
+#### 3. 기초 통계량
+```{r}
+knitr::kable(Session[, list(count=.N,prop = round(.N/nrow(Session),3)), by=DVC_CTG_NM])%>%kable_styling(full_width = F)
+knitr::kable(Session[, list(count=.N,prop = round(.N/nrow(Session),3)), by=ZON_NM]%>%arrange(desc(count)))%>%kable_styling(full_width = F)
+```
+
+\  
+
+#### 4. 요일 더하기
+```{r}
+Session$SESS_DT <- as.Date(ymd(Session$SESS_DT))
+Session$WEEKDAY <- wday(Session$SESS_DT)-1
+```
+(0 : 일요일 ~ 6 : 토요일)
+
+```{r}
+knitr::kable(Session[, list(count=.N,prop = round(.N/nrow(Session),4)), by=WEEKDAY]%>%arrange(WEEKDAY))%>%kable_styling(full_width = F)
+```
+
+월요일, 화요일, 수요일, 일요일의 순서로 많음.
+
+--------------------------------------------------------------------------
+
+## MASTER (data size : 847652 x 5)
+#### &#10161; 상품 분류 데이터 (상품명, 분류명)
+
+```{r}
+head(Master)
+sapply(Master, class)
+```
+
+\  
+
+#### 1. 중복된 제품명
+```{r}
+sum(duplicated(Master$PD_NM)) 
+```
+
+중복된 제품명이 30231개 
+
+<예시>
+```{r}
+nm<-Master$PD_NM[647]
+Master[Master$PD_NM==nm]
+```
+
+\  
+
+#### 2. 분류 개수 확인
+```{r}
+length(unique(Master$CLAC1_NM)) 
+length(unique(Master$CLAC2_NM))
+length(unique(Master$CLAC3_NM))
+```
+
+대분류 37개, 중분류 128개, 소분류 898개
+
+```{r}
+data.frame(table(Master$CLAC1_NM)/nrow(Master)) %>% arrange(desc(Freq)) %>% head(10)
+```
+
+\  
+
+## MERGING
+* SEARCH에 나타나지 않는 고객도 있음
+```{r}
+filter(Product, CLNT_ID==4139680)
+filter(Search1, CLNT_ID==4139680) # no customer data
+```
+
+#### 1-(1) 고객 데이터(Custom)와 세션 데이터(Session) 합치기
+```{r}
+cst_ss <- full_join(Custom, Session, by = "CLNT_ID")
+```
+
+#### 1-(2) 구매 데이터(Product) 합치기
+```{r}
+csp <- full_join(cst_ss, Product, by = c("CLNT_ID","SESS_ID"))
+```
+
+#### 1-(3) 제품 데이터(Master) 합치기
+```{r}
+purchase_full <- left_join(csp, Master, by ="PD_C")
+```
+
+#### 2-(1) 고객 데이터(Custom)와 검색 데이터
